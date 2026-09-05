@@ -15,7 +15,7 @@ void main() {
       expect(stats.commandsFailed, 0);
       expect(stats.totalCommands, 0);
       expect(stats.successRate, 100.0);
-      expect(stats.connectionTimeString, '0:00');
+      expect(stats.connectionTimeString, '00:00');
     });
 
     test('Record successful and failed commands calculates correct rates', () {
