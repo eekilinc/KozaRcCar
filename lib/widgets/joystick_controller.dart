@@ -9,6 +9,7 @@ class JoystickController extends StatefulWidget {
   final CommandConfig commandConfig;
   final double size;
   final double deadzone;
+  final bool showTitle;
 
   const JoystickController({
     Key? key,
@@ -16,6 +17,7 @@ class JoystickController extends StatefulWidget {
     required this.commandConfig,
     this.size = 200,
     this.deadzone = 0.2,
+    this.showTitle = true,
   }) : super(key: key);
 
   @override
@@ -48,11 +50,13 @@ class _JoystickControllerState extends State<JoystickController> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'Joystick',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 16),
+        if (widget.showTitle) ...[
+          Text(
+            'Joystick',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 16),
+        ],
         // Joystick with gesture detection - prevents scroll conflicts
         Listener(
           onPointerDown: (_) => _isPointerDown = true,

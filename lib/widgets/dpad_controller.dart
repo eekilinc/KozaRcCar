@@ -6,12 +6,14 @@ class DPadController extends StatefulWidget {
   final Function(String) onCommand;
   final CommandConfig commandConfig;
   final double size;
+  final bool showTitle;
 
   const DPadController({
     Key? key,
     required this.onCommand,
     required this.commandConfig,
     this.size = 200,
+    this.showTitle = true,
   }) : super(key: key);
 
   @override
@@ -29,11 +31,13 @@ class _DPadControllerState extends State<DPadController> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          'D-Pad',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 16),
+        if (widget.showTitle) ...[
+          Text(
+            'D-Pad',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 16),
+        ],
         Column(
           children: [
             // Up button

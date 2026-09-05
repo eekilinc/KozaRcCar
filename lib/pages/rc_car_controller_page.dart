@@ -248,6 +248,37 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     );
   }
 
+  void _stepSpeed(int delta) {
+    final newSpeed = (_speed + delta).clamp(0, 255);
+    if (newSpeed != _speed) {
+      _setSpeed(newSpeed);
+    }
+  }
+
+  void _showDisconnectConfirmation() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Bağlantıyı Kes'),
+        content: Text('${_connectedDevice?.name ?? "Cihaz"} bağlantısını kesmek istiyor musunuz?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('İptal'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _disconnectDevice();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Bağlantıyı Kes', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   String get _gearName {
     if (_speed <= 100) return 'ECO';
     if (_speed <= 190) return 'NORMAL';
@@ -262,93 +293,96 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        leading: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AboutPage()),
-              );
-            },
-            child: Image.asset(
-              'assets/images/koza_logo.png',
-              width: 40,
-              height: 40,
-              fit: BoxFit.contain,
-            ),
-          ),
-        ),
-        title: const Text('Koza RC Car'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.terminal),
-            onPressed: _openSerialMonitor,
-            tooltip: 'Seri Monitör / Konsol',
-          ),
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: _showControllerHelpDialog,
-            tooltip: 'Kontroller Hakkında',
-          ),
-          PopupMenuButton(
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: const Row(
-                  children: [
-                    Icon(Icons.settings, size: 18, color: Colors.blue),
-                    SizedBox(width: 8),
-                    Text('Ayarlar'),
+    return OrientationBuilder(
+      builder: (context, orientation) {
+        final isLandscape = orientation == Orientation.landscape;
+
+        return Scaffold(
+          appBar: isLandscape
+              ? null
+              : AppBar(
+                  leading: Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: GestureDetector(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const AboutPage()),
+                        );
+                      },
+                      child: Image.asset(
+                        'assets/images/koza_logo.png',
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.contain,
+                      ),
+                    ),
+                  ),
+                  title: const Text('Koza RC Car'),
+                  centerTitle: true,
+                  actions: [
+                    IconButton(
+                      icon: const Icon(Icons.terminal),
+                      onPressed: _openSerialMonitor,
+                      tooltip: 'Seri Monitör / Konsol',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.help_outline),
+                      onPressed: _showControllerHelpDialog,
+                      tooltip: 'Kontroller Hakkında',
+                    ),
+                    PopupMenuButton(
+                      itemBuilder: (context) => [
+                        PopupMenuItem(
+                          child: const Row(
+                            children: [
+                              Icon(Icons.settings, size: 18, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Ayarlar'),
+                            ],
+                          ),
+                          onTap: _openSettings,
+                        ),
+                        PopupMenuItem(
+                          child: const Row(
+                            children: [
+                              Icon(Icons.tune, size: 18, color: Colors.purple),
+                              SizedBox(width: 8),
+                              Text('Komut Tuşları'),
+                            ],
+                          ),
+                          onTap: _openCommandSettings,
+                        ),
+                        PopupMenuItem(
+                          child: const Row(
+                            children: [
+                              Icon(Icons.info, size: 18, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Text('Hakkımda'),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const AboutPage()),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ],
                 ),
-                onTap: _openSettings,
-              ),
-              PopupMenuItem(
-                child: const Row(
-                  children: [
-                    Icon(Icons.tune, size: 18, color: Colors.purple),
-                    SizedBox(width: 8),
-                    Text('Komut Tuşları'),
-                  ],
+          body: isLandscape ? _buildLandscapeGamepad() : _buildPortraitLayout(),
+          floatingActionButton: isLandscape
+              ? null
+              : FloatingActionButton.small(
+                  onPressed: _showCommandReferenceDialog,
+                  tooltip: 'Komut Referansı',
+                  backgroundColor: Colors.blueGrey,
+                  child: const Icon(Icons.info_outline, color: Colors.white),
                 ),
-                onTap: _openCommandSettings,
-              ),
-              PopupMenuItem(
-                child: const Row(
-                  children: [
-                    Icon(Icons.info, size: 18, color: Colors.grey),
-                    SizedBox(width: 8),
-                    Text('Hakkımda'),
-                  ],
-                ),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const AboutPage()),
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: OrientationBuilder(
-        builder: (context, orientation) {
-          if (orientation == Orientation.landscape) {
-            return _buildLandscapeGamepad();
-          }
-          return _buildPortraitLayout();
-        },
-      ),
-      floatingActionButton: FloatingActionButton.small(
-        onPressed: _showCommandReferenceDialog,
-        tooltip: 'Komut Referansı',
-        backgroundColor: Colors.blueGrey,
-        child: const Icon(Icons.info_outline, color: Colors.white),
-      ),
+        );
+      },
     );
   }
 
@@ -407,73 +441,575 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
   Widget _buildLandscapeGamepad() {
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Row(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Column(
           children: [
-            // Left Side: Driving Steering (D-Pad or Joystick)
+            // 1. Sleek Cockpit Top Bar (Height: 34)
+            _buildLandscapeTopBar(),
+            const SizedBox(height: 6),
+
+            // 2. Main Gamepad Body (3 balanced wings, fits without any scrolling)
             Expanded(
-              flex: 4,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _controlMode == 0
-                      ? DPadController(
-                          onCommand: _sendCommand,
-                          commandConfig: _commandConfig,
-                          size: 190,
-                        )
-                      : JoystickController(
-                          onCommand: _sendCommand,
-                          commandConfig: _commandConfig,
-                          size: 190,
-                        ),
-                  const SizedBox(height: 6),
-                  _buildControllerModeSwitcher(compact: true),
+                  // Left Wing: Steering (D-Pad or Joystick)
+                  Expanded(
+                    flex: 10,
+                    child: _buildLandscapeSteeringWing(),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Center Wing: Cockpit HUD, Neon LEDs, and Emergency Stop
+                  Expanded(
+                    flex: 9,
+                    child: _buildLandscapeCenterHUD(),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // Right Wing: Auxiliary Controls (Far, Korna, Vites, Hız)
+                  Expanded(
+                    flex: 11,
+                    child: _buildLandscapeActionWing(),
+                  ),
                 ],
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
 
-            // Center: Telemetry, Speedometer, Neon LEDs, Emergency E-Stop
-            Expanded(
-              flex: 4,
-              child: SingleChildScrollView(
-                child: Column(
+  // Landscape Sleek Top Bar
+  Widget _buildLandscapeTopBar() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141923) : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? const Color(0xFF222B3D) : Colors.grey.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Logo & Title
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AboutPage()),
+              );
+            },
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/koza_logo.png',
+                  width: 22,
+                  height: 22,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(width: 6),
+                const Text(
+                  'KOZA RC',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Bluetooth Connection Chip (Tap to connect / disconnect)
+          InkWell(
+            onTap: _connectedDevice != null ? _showDisconnectConfirmation : _selectDevice,
+            borderRadius: BorderRadius.circular(6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: _connectedDevice != null
+                    ? Colors.green.withValues(alpha: 0.15)
+                    : Colors.red.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _connectedDevice != null
+                      ? Colors.greenAccent.withValues(alpha: 0.4)
+                      : Colors.redAccent.withValues(alpha: 0.4),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _connectedDevice != null ? Icons.bluetooth_connected : Icons.bluetooth_disabled,
+                    size: 13,
+                    color: _connectedDevice != null ? Colors.greenAccent : Colors.redAccent,
+                  ),
+                  const SizedBox(width: 4),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 130),
+                    child: Text(
+                      _connectedDevice != null ? _connectedDevice!.name : 'Cihaza Bağlan',
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: _connectedDevice != null ? Colors.greenAccent : Colors.redAccent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const Spacer(),
+
+          // D-Pad / Joystick mode switcher
+          _buildControllerModeSwitcher(compact: true),
+          const SizedBox(width: 6),
+
+          // Serial Monitor
+          IconButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: const Icon(Icons.terminal, size: 18),
+            onPressed: _openSerialMonitor,
+            tooltip: 'Seri Monitör / Konsol',
+          ),
+
+          // Menu Popup
+          PopupMenuButton(
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            icon: const Icon(Icons.more_vert, size: 18),
+            itemBuilder: (context) => [
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.settings, size: 18, color: Colors.blue),
+                    SizedBox(width: 8),
+                    Text('Ayarlar'),
+                  ],
+                ),
+                onTap: _openSettings,
+              ),
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.tune, size: 18, color: Colors.purple),
+                    SizedBox(width: 8),
+                    Text('Komut Tuşları'),
+                  ],
+                ),
+                onTap: _openCommandSettings,
+              ),
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.help_outline, size: 18, color: Colors.teal),
+                    SizedBox(width: 8),
+                    Text('Yardım / Rehber'),
+                  ],
+                ),
+                onTap: _showControllerHelpDialog,
+              ),
+              PopupMenuItem(
+                child: const Row(
+                  children: [
+                    Icon(Icons.info, size: 18, color: Colors.grey),
+                    SizedBox(width: 8),
+                    Text('Hakkımda'),
+                  ],
+                ),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AboutPage()),
+                  );
+                },
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Left Wing: Steering with dynamic sizing to prevent any overflow
+  Widget _buildLandscapeSteeringWing() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141923) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF222B3D) : Colors.grey.withValues(alpha: 0.15),
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxDim = constraints.maxHeight < constraints.maxWidth
+              ? constraints.maxHeight
+              : constraints.maxWidth;
+          final controllerSize = (maxDim - 8).clamp(130.0, 195.0);
+
+          return Center(
+            child: _controlMode == 0
+                ? DPadController(
+                    onCommand: _sendCommand,
+                    commandConfig: _commandConfig,
+                    size: controllerSize,
+                    showTitle: false,
+                  )
+                : JoystickController(
+                    onCommand: _sendCommand,
+                    commandConfig: _commandConfig,
+                    size: controllerSize,
+                    showTitle: false,
+                  ),
+          );
+        },
+      ),
+    );
+  }
+
+  // Center Wing: Cockpit HUD, Neon Indicators & Emergency Stop
+  Widget _buildLandscapeCenterHUD() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final speedPercent = (_speed * 100 ~/ 255);
+    final isF = _lastSentCommand == _commandConfig.forward;
+    final isB = _lastSentCommand == _commandConfig.backward;
+    final isL = _lastSentCommand == _commandConfig.left;
+    final isR = _lastSentCommand == _commandConfig.right;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141923) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF222B3D) : Colors.grey.withValues(alpha: 0.15),
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Top: Speedometer & Gear Badge
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.speed, color: _gearColor, size: 20),
+                  const SizedBox(width: 4),
+                  Text(
+                    '$speedPercent%',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      color: _gearColor,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: _gearColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: _gearColor.withValues(alpha: 0.5)),
+                ),
+                child: Text(
+                  _gearName,
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                    color: _gearColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Speed progress bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: _speed / 255.0,
+              minHeight: 4,
+              backgroundColor: Colors.grey.withValues(alpha: 0.2),
+              valueColor: AlwaysStoppedAnimation<Color>(_gearColor),
+            ),
+          ),
+
+          // Neon Direction Indicators (Centered with FittedBox)
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildLedItem(Icons.arrow_upward, isF, 'İLERİ', Colors.cyanAccent, size: 14),
+                const SizedBox(width: 4),
+                _buildLedItem(Icons.arrow_downward, isB, 'GERİ', Colors.amberAccent, size: 14),
+                const SizedBox(width: 4),
+                _buildLedItem(Icons.arrow_back, isL, 'SOL', Colors.greenAccent, size: 14),
+                const SizedBox(width: 4),
+                _buildLedItem(Icons.arrow_forward, isR, 'SAĞ', Colors.greenAccent, size: 14),
+              ],
+            ),
+          ),
+
+          // Emergency Stop Button (E-STOP)
+          SizedBox(
+            width: double.infinity,
+            height: 38,
+            child: ElevatedButton(
+              onPressed: _connectedDevice != null ? _emergencyStop : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[700],
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey[400],
+                elevation: 4,
+                shadowColor: Colors.red.withValues(alpha: 0.6),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildCockpitDashboard(compact: true),
-                    const SizedBox(height: 10),
-                    _buildEmergencyStopButton(compact: true),
-                    const SizedBox(height: 8),
-                    // Quick connection badge
+                    Icon(Icons.dangerous, size: 18, color: Colors.white),
+                    SizedBox(width: 6),
                     Text(
-                      _connectedDevice != null
-                          ? '● ${_connectedDevice!.name}'
-                          : '○ Bağlantı Yok',
+                      'ACİL STOP',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: _connectedDevice != null ? Colors.green : Colors.red,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.1,
                       ),
                     ),
                   ],
                 ),
               ),
             ),
+          ),
 
-            // Right Side: Action buttons (Far, Korna, Vites)
-            Expanded(
-              flex: 4,
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildQuickActionBar(isLandscape: true),
-                  ],
+          // Telemetry Ticker
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                _lastSentCommand.isNotEmpty ? 'TX: $_lastSentCommand' : 'TX: -',
+                style: const TextStyle(
+                  fontSize: 10,
+                  color: Colors.cyanAccent,
+                  fontFamily: 'monospace',
+                  fontWeight: FontWeight.bold,
                 ),
               ),
-            ),
-          ],
+              Text(
+                'PWM: $_speed',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: Colors.grey[400],
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Right Wing: Auxiliary Controls (Far, Korna, Vites, Hız)
+  Widget _buildLandscapeActionWing() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF141923) : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isDark ? const Color(0xFF222B3D) : Colors.grey.withValues(alpha: 0.15),
         ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Row 1: Far & Korna buttons with FittedBox
+          Row(
+            children: [
+              // Far button
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: _connectedDevice != null ? _toggleLED : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _ledOn
+                          ? Colors.amber[700]
+                          : (isDark ? const Color(0xFF1E2838) : Colors.grey[300]),
+                      foregroundColor: _ledOn
+                          ? Colors.white
+                          : (isDark ? Colors.white70 : Colors.black87),
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: _ledOn ? 3 : 0,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            _ledOn ? Icons.light_mode : Icons.light_mode_outlined,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _ledOn ? 'FAR: AÇIK' : 'FAR: KAPALI',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Korna button
+              Expanded(
+                child: SizedBox(
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: _connectedDevice != null
+                        ? (_hornActive ? null : _activateHorn)
+                        : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _hornActive ? Colors.deepOrange : Colors.orange[700],
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 2,
+                    ),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.volume_up, size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            _hornActive ? 'ÇALIYOR' : 'KORNA',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 10),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // Row 2: Vites Seçimleri (ECO, NORMAL, SPORT)
+          Row(
+            children: [
+              Expanded(
+                child: _buildGearButton(
+                  label: 'ECO',
+                  sub: '%33',
+                  speedVal: _commandConfig.speedLow,
+                  color: Colors.green,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: _buildGearButton(
+                  label: 'NORMAL',
+                  sub: '%66',
+                  speedVal: _commandConfig.speedMedium,
+                  color: Colors.orange,
+                  compact: true,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: _buildGearButton(
+                  label: 'SPORT',
+                  sub: '%100',
+                  speedVal: _commandConfig.speedHigh,
+                  color: Colors.red,
+                  compact: true,
+                ),
+              ),
+            ],
+          ),
+
+          // Row 3: Hız Slider with micro-adjust buttons
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF0F131C) : Colors.grey.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                InkWell(
+                  onTap: _connectedDevice != null ? () => _stepSpeed(-15) : null,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Icon(Icons.remove, size: 16, color: Colors.grey[400]),
+                  ),
+                ),
+                Expanded(
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 2,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
+                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
+                    ),
+                    child: Slider(
+                      value: _speed.toDouble(),
+                      min: 0,
+                      max: 255,
+                      activeColor: _gearColor,
+                      inactiveColor: Colors.grey.withValues(alpha: 0.2),
+                      onChanged: _connectedDevice != null ? (v) => _setSpeed(v.toInt()) : null,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: _connectedDevice != null ? () => _stepSpeed(15) : null,
+                  borderRadius: BorderRadius.circular(4),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: Icon(Icons.add, size: 16, color: Colors.grey[400]),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -602,12 +1138,12 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     );
   }
 
-  Widget _buildLedItem(IconData icon, bool active, String tooltip, Color activeColor) {
+  Widget _buildLedItem(IconData icon, bool active, String tooltip, Color activeColor, {double size = 16}) {
     return Tooltip(
       message: tooltip,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.all(6),
+        padding: EdgeInsets.all(size > 14 ? 6 : 4),
         decoration: BoxDecoration(
           color: active ? activeColor.withValues(alpha: 0.2) : Colors.grey.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
@@ -627,7 +1163,7 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
         ),
         child: Icon(
           icon,
-          size: 16,
+          size: size,
           color: active ? activeColor : Colors.grey[500],
         ),
       ),
@@ -648,25 +1184,28 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
           disabledBackgroundColor: Colors.grey[400],
           elevation: 4,
           shadowColor: Colors.red.withValues(alpha: 0.5),
-          padding: EdgeInsets.symmetric(vertical: compact ? 10 : 14),
+          padding: EdgeInsets.symmetric(vertical: compact ? 8 : 14, horizontal: 8),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.dangerous, size: 24, color: Colors.white),
-            const SizedBox(width: 8),
-            Text(
-              'ACİL STOP (E-STOP)',
-              style: TextStyle(
-                fontSize: compact ? 13 : 15,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 1.2,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.dangerous, size: compact ? 20 : 24, color: Colors.white),
+              const SizedBox(width: 8),
+              Text(
+                'ACİL STOP (E-STOP)',
+                style: TextStyle(
+                  fontSize: compact ? 12 : 15,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -703,9 +1242,12 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
                       _ledOn ? Icons.light_mode : Icons.light_mode_outlined,
                       size: 20,
                     ),
-                    label: Text(
-                      _ledOn ? 'FAR AÇIK' : 'FAR KAPALI',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _ledOn ? 'FAR AÇIK' : 'FAR KAPALI',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
                     ),
                   ),
                 ),
@@ -724,9 +1266,12 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     icon: const Icon(Icons.volume_up, size: 20),
-                    label: Text(
-                      _hornActive ? 'ÇALIYOR...' : 'KORNA',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                    label: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        _hornActive ? 'ÇALIYOR...' : 'KORNA',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
+                      ),
                     ),
                   ),
                 ),
@@ -808,6 +1353,7 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     required String sub,
     required int speedVal,
     required MaterialColor color,
+    bool compact = false,
   }) {
     final isSelected = (_speed - speedVal).abs() < 25;
 
@@ -815,7 +1361,7 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
       onTap: _connectedDevice != null ? () => _setSpeed(speedVal) : null,
       borderRadius: BorderRadius.circular(8),
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: EdgeInsets.symmetric(vertical: compact ? 6 : 8, horizontal: 2),
         decoration: BoxDecoration(
           color: isSelected ? color.withValues(alpha: 0.15) : Colors.grey.withValues(alpha: 0.08),
           borderRadius: BorderRadius.circular(8),
@@ -825,20 +1371,29 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: isSelected ? color : Colors.grey[700],
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: compact ? 10 : 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? color : Colors.grey[700],
+                ),
               ),
             ),
-            Text(
-              sub,
-              style: TextStyle(
-                fontSize: 9,
-                color: isSelected ? color[700] : Colors.grey[500],
+            const SizedBox(height: 1),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                sub,
+                style: TextStyle(
+                  fontSize: compact ? 8 : 9,
+                  color: isSelected ? color[700] : Colors.grey[500],
+                ),
               ),
             ),
           ],
@@ -851,87 +1406,89 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
   // BİLEŞEN: D-PAD / JOYSTICK SEÇİCİ
   // ==========================================
   Widget _buildControllerModeSwitcher({bool compact = false}) {
+    Widget dpadBtn = GestureDetector(
+      onTap: () => setState(() => _controlMode = 0),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: compact ? 4 : 8,
+          horizontal: compact ? 8 : 0,
+        ),
+        decoration: BoxDecoration(
+          color: _controlMode == 0 ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(compact ? 6 : 8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+          children: [
+            Icon(
+              Icons.apps,
+              color: _controlMode == 0 ? Colors.white : Colors.grey,
+              size: compact ? 14 : 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'D-Pad',
+              style: TextStyle(
+                color: _controlMode == 0 ? Colors.white : Colors.grey[700],
+                fontWeight: FontWeight.bold,
+                fontSize: compact ? 10 : 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    Widget joystickBtn = GestureDetector(
+      onTap: () => setState(() => _controlMode = 1),
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          vertical: compact ? 4 : 8,
+          horizontal: compact ? 8 : 0,
+        ),
+        decoration: BoxDecoration(
+          color: _controlMode == 1 ? Colors.blue : Colors.transparent,
+          borderRadius: BorderRadius.circular(compact ? 6 : 8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+          children: [
+            Icon(
+              Icons.sports_esports,
+              color: _controlMode == 1 ? Colors.white : Colors.grey,
+              size: compact ? 14 : 16,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              'Joystick',
+              style: TextStyle(
+                color: _controlMode == 1 ? Colors.white : Colors.grey[700],
+                fontWeight: FontWeight.bold,
+                fontSize: compact ? 10 : 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.grey.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(compact ? 8 : 10),
       ),
-      padding: const EdgeInsets.all(3),
+      padding: const EdgeInsets.all(2),
       child: Row(
         mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
-        children: [
-          Expanded(
-            flex: compact ? 0 : 1,
-            child: GestureDetector(
-              onTap: () => setState(() => _controlMode = 0),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  vertical: compact ? 6 : 8,
-                  horizontal: compact ? 12 : 0,
-                ),
-                decoration: BoxDecoration(
-                  color: _controlMode == 0 ? Colors.blue : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.apps,
-                      color: _controlMode == 0 ? Colors.white : Colors.grey,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'D-Pad',
-                      style: TextStyle(
-                        color: _controlMode == 0 ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            flex: compact ? 0 : 1,
-            child: GestureDetector(
-              onTap: () => setState(() => _controlMode = 1),
-              child: Container(
-                padding: EdgeInsets.symmetric(
-                  vertical: compact ? 6 : 8,
-                  horizontal: compact ? 12 : 0,
-                ),
-                decoration: BoxDecoration(
-                  color: _controlMode == 1 ? Colors.blue : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.sports_esports,
-                      color: _controlMode == 1 ? Colors.white : Colors.grey,
-                      size: 16,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Joystick',
-                      style: TextStyle(
-                        color: _controlMode == 1 ? Colors.white : Colors.grey[700],
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        children: compact
+            ? [dpadBtn, const SizedBox(width: 2), joystickBtn]
+            : [
+                Expanded(child: dpadBtn),
+                const SizedBox(width: 4),
+                Expanded(child: joystickBtn),
+              ],
       ),
     );
   }
