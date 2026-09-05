@@ -185,13 +185,9 @@ A: Uygulamadaki info butonundan bilgi al. HC-06 genellikle Classic kullanır.
 
 ---
 
-## 📚 Dokümantasyon
+## 📚 Gömülü Sistem & Arduino Kodu
 
-Daha detaylı bilgi için:
-- [QUICK_START_GUIDE.md](QUICK_START_GUIDE.md) - Kurulum ve başlangıç
-- [FINALIZATION_REPORT.md](FINALIZATION_REPORT.md) - Teknik detaylar
-- [TESTING_CHECKLIST.md](TESTING_CHECKLIST.md) - Test senaryoları
-- [PROJECT_INDEX.md](PROJECT_INDEX.md) - Dosya referansları
+Arduino bağlantıları ve motor sürücü (L298N) yapılandırması için projedeki [arduino_sketch.ino](arduino_sketch.ino) dosyasını inceleyebilirsiniz.
 
 ---
 
