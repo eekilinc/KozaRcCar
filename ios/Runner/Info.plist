@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Benim Flutter Projem</string>
+	<string>Koza RC Car</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -13,7 +13,11 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>benim_flutter_projem</string>
+	<string>koza_rc_car</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Koza RC Car uzaktan kumandalı araca Bluetooth üzerinden bağlanmak için Bluetooth izni gerektirir.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Koza RC Car uzaktan kumandalı araca Bluetooth üzerinden bağlanmak için Bluetooth izni gerektirir.</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

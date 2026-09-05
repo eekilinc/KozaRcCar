@@ -45,7 +45,28 @@ const int hornPin = 12;     // Buzzer/Horn
 const int speedPin = 3;     // PWM for speed control (use PWM-capable pin)
 
 // Motor speed (PWM value: 0-255)
+// Motor speed (PWM value: 0-255)
 int motorSpeed = 255; // Maximum speed (can be changed dynamically)
+
+// Safety Watchdog & Non-blocking Horn
+unsigned long lastCommandTime = 0;
+const unsigned long WATCHDOG_TIMEOUT = 1500; // Auto-stop if no command received in 1.5s while moving
+bool isMoving = false;
+
+bool hornActive = false;
+unsigned long hornStartTime = 0;
+const unsigned long HORN_DURATION = 500; // 500ms horn pulse
+
+// Function declarations
+void processCommand(String cmd);
+void processSingleChar(char moveCmd);
+void moveForward();
+void moveBackward();
+void turnLeft();
+void turnRight();
+void stopMotors();
+void activateHorn();
+void checkHorn();
 
 void setup() {
   // Initialize serial communication with computer (for debugging)
@@ -72,56 +93,95 @@ void setup() {
   // Stop motors initially
   stopMotors();
   
-  Serial.println("RC Car Controller Initialized");
+  Serial.println("RC Car Controller Initialized with Watchdog Safety");
   Serial.println("Waiting for Bluetooth commands...");
 }
 
 void loop() {
   // Check if data is available from HC-06
-  if (hc06.available()) {
-    String command = "";
+  while (hc06.available()) {
+    char c = (char)hc06.read();
     
-    // Read the complete command
-    while (hc06.available()) {
-      command += (char)hc06.read();
-      delay(2); // Small delay to ensure complete command reading
+    // Ignore whitespace and line endings
+    if (c == '\r' || c == '\n' || c == ' ') continue;
+    
+    char lowerC = tolower(c);
+    
+    // Single character movement commands (F, B, L, R, S)
+    // Note: 'L' followed by digit (L0, L1) is handled as multi-char command below
+    if (lowerC == 'f' || lowerC == 'b' || lowerC == 'r' || lowerC == 's') {
+      processSingleChar(lowerC);
+    } else if (c == 'l' || c == 'L') {
+      // Check if it's LED command (L0 / L1) or Left command (L)
+      delay(5);
+      if (hc06.available() && (hc06.peek() == '0' || hc06.peek() == '1')) {
+        char val = (char)hc06.read();
+        String cmd = "L";
+        cmd += val;
+        processCommand(cmd);
+      } else {
+        processSingleChar('l');
+      }
+    } else {
+      // Multi-character command (e.g. V128, H1)
+      String multiCmd = "";
+      multiCmd += c;
+      unsigned long readStart = millis();
+      while (millis() - readStart < 30) {
+        if (hc06.available()) {
+          char nextC = (char)hc06.read();
+          if (nextC == '\r' || nextC == '\n') break;
+          multiCmd += nextC;
+        }
+      }
+      processCommand(multiCmd);
     }
-    
-    Serial.print("Received command: ");
-    Serial.println(command);
-    
-    // Process the command
-    processCommand(command);
+  }
+
+  // Safety Watchdog: stop motors if signal is lost while moving
+  if (isMoving && (millis() - lastCommandTime > WATCHDOG_TIMEOUT)) {
+    stopMotors();
+    Serial.println("⚠️ Watchdog Triggered: Signal lost, motors safely stopped.");
+  }
+
+  // Non-blocking horn check
+  checkHorn();
+}
+
+void processSingleChar(char moveCmd) {
+  lastCommandTime = millis();
+  switch(moveCmd) {
+    case 'f':
+      isMoving = true;
+      moveForward();
+      break;
+    case 'b':
+      isMoving = true;
+      moveBackward();
+      break;
+    case 'l':
+      isMoving = true;
+      turnLeft();
+      break;
+    case 'r':
+      isMoving = true;
+      turnRight();
+      break;
+    case 's':
+      isMoving = false;
+      stopMotors();
+      break;
   }
 }
 
 void processCommand(String cmd) {
-  // Remove any whitespace
   cmd.trim();
+  if (cmd.length() == 0) return;
   
-  // Movement commands (single character)
-  if (cmd.length() == 1) {
-    char moveCmd = tolower(cmd[0]);
-    switch(moveCmd) {
-      case 'f':  // Forward
-        moveForward();
-        break;
-      case 'b':  // Backward
-        moveBackward();
-        break;
-      case 'l':  // Left
-        turnLeft();
-        break;
-      case 'r':  // Right
-        turnRight();
-        break;
-      case 's':  // Stop
-        stopMotors();
-        break;
-    }
-  }
+  lastCommandTime = millis();
+  
   // LED Control (L0 = OFF, L1 = ON)
-  else if (cmd.startsWith("L")) {
+  if (cmd.startsWith("L") || cmd.startsWith("l")) {
     String value = cmd.substring(1);
     if (value == "0") {
       digitalWrite(ledPin, LOW);
@@ -132,7 +192,7 @@ void processCommand(String cmd) {
     }
   }
   // Speed Control (V000-V255)
-  else if (cmd.startsWith("V")) {
+  else if (cmd.startsWith("V") || cmd.startsWith("v")) {
     String speedStr = cmd.substring(1);
     int speed = speedStr.toInt();
     
@@ -143,7 +203,7 @@ void processCommand(String cmd) {
     }
   }
   // Horn Control (H1 = activate)
-  else if (cmd == "H1") {
+  else if (cmd.equalsIgnoreCase("H1") || cmd.equalsIgnoreCase("H")) {
     activateHorn();
   }
   else {
@@ -153,100 +213,58 @@ void processCommand(String cmd) {
 }
 
 void moveForward() {
-  // Left motor forward
   analogWrite(motor1Pin1, motorSpeed);
   analogWrite(motor1Pin2, 0);
-  
-  // Right motor forward
   analogWrite(motor2Pin1, motorSpeed);
   analogWrite(motor2Pin2, 0);
-  
   Serial.println("Moving Forward");
 }
 
 void moveBackward() {
-  // Left motor backward
   analogWrite(motor1Pin1, 0);
   analogWrite(motor1Pin2, motorSpeed);
-  
-  // Right motor backward
   analogWrite(motor2Pin1, 0);
   analogWrite(motor2Pin2, motorSpeed);
-  
   Serial.println("Moving Backward");
 }
 
 void turnLeft() {
-  // Left motor stop/slow
   analogWrite(motor1Pin1, 0);
   analogWrite(motor1Pin2, 0);
-  
-  // Right motor forward (to turn left)
   analogWrite(motor2Pin1, motorSpeed);
   analogWrite(motor2Pin2, 0);
-  
   Serial.println("Turning Left");
 }
 
 void turnRight() {
-  // Left motor forward (to turn right)
   analogWrite(motor1Pin1, motorSpeed);
   analogWrite(motor1Pin2, 0);
-  
-  // Right motor stop/slow
   analogWrite(motor2Pin1, 0);
   analogWrite(motor2Pin2, 0);
-  
   Serial.println("Turning Right");
 }
 
 void stopMotors() {
-  // Stop all motors
+  isMoving = false;
   analogWrite(motor1Pin1, 0);
   analogWrite(motor1Pin2, 0);
   analogWrite(motor2Pin1, 0);
   analogWrite(motor2Pin2, 0);
-  
   Serial.println("Motors Stopped");
 }
 
-/*
- * NOTES:
- * 
- * 1. Motor Direction Configuration:
- *    - To make the car move forward, both motors should spin in the same direction
- *    - To make the car turn, reduce power to one motor or reverse it
- * 
- * 2. PWM Speed Control:
- *    - motorSpeed can be adjusted (0-255) for faster or slower movement
- *    - Use analogWrite() to control motor speed
- * 
- * 3. Baud Rate:
- *    - HC-06 default baud rate is 9600
- *    - Make sure both Serial and SoftwareSerial use the same baud rate
- * 
- * 4. Power Supply:
- *    - Use a separate power source for motors (usually 6-12V)
- *    - Don't draw motor current through Arduino pins directly
- * 
- * 5. Alternative Turn Commands:
- *    Instead of stopping one motor to turn, you can:
- *    - Add new commands like 'L' for left strafe (both motors forward, one slower)
- *    - Use PWM values to create smooth curves
- * 
- * 6. Enhanced Version with Speed Control:
- *    Add commands like:
- *    - '1'-'9' for different speed levels
- *    - 'U' to increase speed
- *    - 'D' to decrease speed
- */
-
 void activateHorn() {
-  // Activate horn for 500ms
   digitalWrite(hornPin, HIGH);
+  hornActive = true;
+  hornStartTime = millis();
   Serial.println("Horn activated");
-  delay(500);
-  digitalWrite(hornPin, LOW);
-  Serial.println("Horn deactivated");
+}
+
+void checkHorn() {
+  if (hornActive && (millis() - hornStartTime >= HORN_DURATION)) {
+    digitalWrite(hornPin, LOW);
+    hornActive = false;
+    Serial.println("Horn deactivated");
+  }
 }
 

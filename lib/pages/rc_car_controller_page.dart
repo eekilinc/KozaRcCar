@@ -60,6 +60,10 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     _stopMonitoring();
     _disconnectCount = 0; // Reset counter
     
+    final stats = ConnectionStats();
+    stats.endConnection();
+    _bluetoothService.disconnect();
+
     setState(() {
       _connectedDevice = null;
     });
@@ -72,17 +76,15 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
         duration: Duration(seconds: 3),
       ),
     );
-
-    // Go back to device selection
-    Navigator.pushReplacementNamed(context, '/');
   }
 
-  void _loadCommandConfig() {
-    // In a real app, you'd load this from SharedPreferences
-    // For now, we'll use the default configuration
-    setState(() {
-      _commandConfig = CommandConfig();
-    });
+  Future<void> _loadCommandConfig() async {
+    final config = await CommandConfig.loadFromPrefs();
+    if (mounted) {
+      setState(() {
+        _commandConfig = config;
+      });
+    }
   }
 
   Future<void> _selectDevice() async {
@@ -124,9 +126,12 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     );
 
     if (newConfig != null) {
-      setState(() {
-        _commandConfig = newConfig;
-      });
+      await newConfig.saveToPrefs();
+      if (mounted) {
+        setState(() {
+          _commandConfig = newConfig;
+        });
+      }
     }
   }
 
@@ -148,12 +153,9 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
     // Record command in stats
     stats.recordCommandSent(success);
     
-    // Play sound feedback
+    // Play sound feedback asynchronously without blocking command throughput
     if (soundService.soundEnabled) {
-      print('[Sound] Playing command sound (enabled: true)');
-      await soundService.playCommandSound();
-    } else {
-      print('[Sound] Sound disabled - not playing');
+      soundService.playCommandSound();
     }
     
     if (success) {
@@ -433,8 +435,6 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
         ],
       ),
       body: SingleChildScrollView(
-        primary: false,
-        physics: const NeverScrollableScrollPhysics(),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -591,7 +591,7 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
                   _buildStatItem(
                     icon: Icons.percent,
                     label: 'Başarı Oranı',
-                    value: '${(stats.successRate * 100).toStringAsFixed(1)}%',
+                    value: '${stats.successRate.toStringAsFixed(1)}%',
                   ),
                 ],
               ),
@@ -890,28 +890,19 @@ class _RCCarControllerPageState extends State<RCCarControllerPage> {
                 ),
                 const SizedBox(height: 8),
                 // Speed Gauge/Meter
-                Container(
-                  height: 8,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(4),
-                    color: Colors.grey[300],
-                  ),
-                  child: Stack(
-                    children: [
-                      // Speed level indicator
-                      Container(
-                        width: ((_speed / 255) * double.infinity),
-                        height: 8,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(4),
-                          color: _speed < 85
-                              ? Colors.green
-                              : _speed < 170
-                                  ? Colors.orange
-                                  : Colors.red,
-                        ),
-                      ),
-                    ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: _speed / 255.0,
+                    minHeight: 8,
+                    backgroundColor: Colors.grey[300],
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      _speed < 85
+                          ? Colors.green
+                          : _speed < 170
+                              ? Colors.orange
+                              : Colors.red,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 10),

@@ -28,9 +28,7 @@ class _JoystickControllerState extends State<JoystickController> {
   bool _isPressed = false;
   bool _isPointerDown = false;
   String? _lastCommand;
-  Timer? _autoStopTimer; // Auto-stop after 1 second
   DateTime? _movementStartTime; // Track when movement started
-  static const int _instantModeDuration = 1000; // 1 second for instant mode
   static const int _stabilizationDelayMs = 200; // Wait for movement to stabilize
 
   @override
@@ -42,7 +40,6 @@ class _JoystickControllerState extends State<JoystickController> {
 
   @override
   void dispose() {
-    _autoStopTimer?.cancel();
     super.dispose();
   }
 
@@ -63,8 +60,6 @@ class _JoystickControllerState extends State<JoystickController> {
           child: GestureDetector(
             onPanStart: (_) {
               setState(() => _isPressed = true);
-              // Cancel any existing timer
-              _autoStopTimer?.cancel();
               // Mark movement start time for stabilization
               _movementStartTime = DateTime.now();
             },
@@ -76,9 +71,6 @@ class _JoystickControllerState extends State<JoystickController> {
                 _isPressed = false;
                 _joystickPosition = _centerPosition;
               });
-              // Cancel timer and send stop immediately
-              _autoStopTimer?.cancel();
-              _autoStopTimer = null;
               _movementStartTime = null; // Reset movement start time
               widget.onCommand(widget.commandConfig.stop);
               _lastCommand = null;
@@ -247,26 +239,10 @@ class _JoystickControllerState extends State<JoystickController> {
       }
     }
 
-    // INSTANT MODE: Send command only if different from last
+    // Send command when direction changes
     if (command != _lastCommand) {
       widget.onCommand(command);
       _lastCommand = command;
-      
-      // If this is a movement command (not stop), set auto-stop timer
-      if (command != widget.commandConfig.stop) {
-        // Cancel existing timer
-        _autoStopTimer?.cancel();
-        
-        // Set new timer to auto-stop after 1 second
-        _autoStopTimer = Timer(
-          Duration(milliseconds: _instantModeDuration),
-          () {
-            widget.onCommand(widget.commandConfig.stop);
-            _lastCommand = widget.commandConfig.stop;
-            _autoStopTimer = null;
-          },
-        );
-      }
     }
   }
 

@@ -126,13 +126,13 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
     // DUAL devices only shown in the mode explicitly selected
     List<BondedDevice> filteredDevices;
     if (_isClassicMode) {
-      // Classic mode: ONLY show CLASSIC devices (not BLE, not UNKNOWN)
-      filteredDevices = allDevices.where((d) => d.type == "CLASSIC").toList();
-      print('Classic mode - showing ${filteredDevices.length} CLASSIC devices (excluding BLE and DUAL)');
+      // Classic mode: Show CLASSIC, DUAL, and UNKNOWN devices (many Android stacks report HC-05/06 as UNKNOWN or DUAL)
+      filteredDevices = allDevices.where((d) => d.type == "CLASSIC" || d.type == "DUAL" || d.type == "UNKNOWN").toList();
+      print('Classic mode - showing ${filteredDevices.length} devices (CLASSIC/DUAL/UNKNOWN)');
     } else {
-      // BLE mode: ONLY show BLE devices (not CLASSIC, not UNKNOWN)
-      filteredDevices = allDevices.where((d) => d.type == "BLE").toList();
-      print('BLE mode - showing ${filteredDevices.length} BLE devices (excluding CLASSIC and DUAL)');
+      // BLE mode: Show BLE and DUAL devices
+      filteredDevices = allDevices.where((d) => d.type == "BLE" || d.type == "DUAL").toList();
+      print('BLE mode - showing ${filteredDevices.length} BLE/DUAL devices');
     }
     
     for (var device in filteredDevices) {
@@ -591,9 +591,9 @@ class _DeviceSelectionPageState extends State<DeviceSelectionPage> {
                               itemCount: _recentlyConnectedDevices.length,
                               itemBuilder: (context, index) {
                                 final device = _recentlyConnectedDevices[index];
-                                // Only show if matches current mode
-                                final matches = (_isClassicMode && device.type == "CLASSIC") ||
-                                    (!_isClassicMode && device.type == "BLE");
+                                // Show if matches current mode
+                                final matches = (_isClassicMode && (device.type == "CLASSIC" || device.type == "DUAL" || device.type == "UNKNOWN")) ||
+                                    (!_isClassicMode && (device.type == "BLE" || device.type == "DUAL"));
                                 
                                 if (!matches) return const SizedBox.shrink();
                                 

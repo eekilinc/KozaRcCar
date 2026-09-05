@@ -1,5 +1,10 @@
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
+
 /// Command configuration model for RC car control
 class CommandConfig {
+  static const String _prefsKey = 'custom_command_config';
+
   String forward;
   String backward;
   String left;
@@ -90,4 +95,28 @@ class CommandConfig {
       speedHigh: json['speedHigh'] ?? 255,
     );
   }
+
+  /// Save current configuration to SharedPreferences
+  Future<bool> saveToPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return await prefs.setString(_prefsKey, jsonEncode(toJson()));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Load configuration from SharedPreferences or return default
+  static Future<CommandConfig> loadFromPrefs() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_prefsKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final Map<String, dynamic> json = jsonDecode(jsonStr);
+        return CommandConfig.fromJson(json);
+      }
+    } catch (_) {}
+    return CommandConfig();
+  }
 }
+

@@ -67,7 +67,9 @@ class MainActivity : FlutterActivity() {
                                 // Run connection in background thread to avoid blocking UI
                                 Thread {
                                     val success = connectToClassicBluetooth(address)
-                                    result.success(success)
+                                    runOnUiThread {
+                                        result.success(success)
+                                    }
                                 }.start()
                             } else {
                                 result.error("ERROR", "Address is null", null)
@@ -79,16 +81,11 @@ class MainActivity : FlutterActivity() {
                     "sendCommand" -> {
                         try {
                             val command = call.argument<String>("command")
-                            android.util.Log.d("BluetoothCommand", "sendCommand called with: $command, outputStream: $outputStream, socket: $bluetoothSocket")
                             if (command != null && outputStream != null) {
                                 outputStream!!.write(command.toByteArray())
                                 outputStream!!.flush()
-                                // HC-06 needs time to process each command
-                                Thread.sleep(50)
-                                android.util.Log.d("BluetoothCommand", "✓ Sent: $command")
                                 result.success(true)
                             } else {
-                                android.util.Log.e("BluetoothCommand", "✗ Not connected - outputStream: $outputStream, command: $command")
                                 result.success(false)
                             }
                         } catch (e: Exception) {
@@ -418,63 +415,7 @@ class MainActivity : FlutterActivity() {
         }
     }
     
-    private fun startBleScan(result: MethodChannel.Result) {
-        try {
-            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: run {
-                result.error("ERROR", "Bluetooth adapter not found", null)
-                return
-            }
-            
-            android.util.Log.d("BleScan", "Starting native Android BLE scan...")
-            
-            if (!bluetoothAdapter.isEnabled) {
-                android.util.Log.e("BleScan", "Bluetooth is not enabled")
-                result.error("ERROR", "Bluetooth is not enabled", null)
-                return
-            }
-            
-            val bluetoothLeScanner = bluetoothAdapter.bluetoothLeScanner
-            if (bluetoothLeScanner == null) {
-                android.util.Log.e("BleScan", "BLE scanner not available")
-                result.error("ERROR", "BLE scanner not available", null)
-                return
-            }
-            
-            android.util.Log.d("BleScan", "✓ Starting BLE scan...")
-            bluetoothLeScanner.startScan(scanCallbackLe)
-            result.success(true)
-            
-        } catch (e: Exception) {
-            android.util.Log.e("BleScan", "Error starting BLE scan: ${e.message}", e)
-            result.error("ERROR", "Error starting BLE scan", e.message)
-        }
-    }
-    
-    private fun stopBleScan() {
-        try {
-            val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
-            val bluetoothLeScanner = bluetoothAdapter?.bluetoothLeScanner
-            bluetoothLeScanner?.stopScan(scanCallbackLe)
-            android.util.Log.d("BleScan", "BLE scan stopped")
-        } catch (e: Exception) {
-            android.util.Log.e("BleScan", "Error stopping BLE scan: ${e.message}")
-        }
-    }
-    
-    private val scanCallbackLe = object : ScanCallback() {
-        override fun onScanResult(callbackType: Int, result: ScanResult?) {
-            super.onScanResult(callbackType, result)
-            if (result != null) {
-                android.util.Log.d("BleScan", "Found (LE): ${result.device.name} (${result.device.address}) RSSI: ${result.rssi}")
-            }
-        }
-        
-        override fun onScanFailed(errorCode: Int) {
-            super.onScanFailed(errorCode)
-            android.util.Log.e("BleScan", "Scan failed with error code: $errorCode")
-        }
-    }
-    
+
     private fun connectToClassicBluetooth(address: String): Boolean {
         return try {
             android.util.Log.d("BluetoothConnect", "Connecting to $address")
@@ -482,11 +423,18 @@ class MainActivity : FlutterActivity() {
             // Get Bluetooth adapter
             val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter() ?: return false
             
+            // Cancel discovery before connecting to prevent timeouts and speed degradation
+            if (bluetoothAdapter.isDiscovering) {
+                bluetoothAdapter.cancelDiscovery()
+            }
+            
             // Get the remote device
             val device = bluetoothAdapter.getRemoteDevice(address)
             
             // Close any existing connection
-            bluetoothSocket?.close()
+            try {
+                bluetoothSocket?.close()
+            } catch (_: Exception) {}
             
             // Create socket with HC-06 Serial Port UUID
             bluetoothSocket = device.createRfcommSocketToServiceRecord(HC06_UUID)
@@ -508,8 +456,25 @@ class MainActivity : FlutterActivity() {
             android.util.Log.d("BluetoothConnect", "✓ Successfully connected to $address")
             true
         } catch (e: Exception) {
-            android.util.Log.e("BluetoothConnect", "✗ Error connecting: ${e.message}", e)
-            bluetoothSocket?.close()
+            android.util.Log.e("BluetoothConnect", "Standard connection failed: ${e.message}. Attempting fallback channel 1...", e)
+            try {
+                val bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
+                val device = bluetoothAdapter?.getRemoteDevice(address)
+                val method = device?.javaClass?.getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                val fallbackSocket = method?.invoke(device, 1) as? BluetoothSocket
+                fallbackSocket?.connect()
+                outputStream = fallbackSocket?.outputStream
+                bluetoothSocket = fallbackSocket
+                if (outputStream != null) {
+                    android.util.Log.d("BluetoothConnect", "✓ Successfully connected via fallback channel 1 to $address")
+                    return true
+                }
+            } catch (fallbackEx: Exception) {
+                android.util.Log.e("BluetoothConnect", "✗ Fallback connection also failed: ${fallbackEx.message}")
+            }
+            try {
+                bluetoothSocket?.close()
+            } catch (_: Exception) {}
             bluetoothSocket = null
             outputStream = null
             false
